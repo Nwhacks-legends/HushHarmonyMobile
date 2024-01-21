@@ -12,7 +12,7 @@ console.log(BACKEND_URL);
 
 const App = () => {
   const [data, setData] = useState({ lat: 0, long: 0, noise: 0, timestamp: 0 });
-  const updateInterval = 12000; // Update every 60 seconds
+  const updateInterval = 2400; // Update every 60 seconds
   const [showSuccessMessage, setShowSuccessMessage] = useState(false);
 
 
@@ -130,22 +130,25 @@ const App = () => {
 
   const fetchNoiseLevel = () => {
     return new Promise((resolve) => {
+      const noiseLevels= [];
       SoundLevel.start(20); // interval 250ms
       let cnt = 0;
-      const numRecords = 100;
+      const numRecords = 40;
       let noiseLevel = 0;
-      const noiseLevelNormilizer = 160;
       SoundLevel.onNewFrame = (noiseData) => {
         console.log("noise level", noiseData);
-        // skip first 2 values for calibrating
+        // skip first 2 values as they are always 0
         if(cnt > 1) {
-          noiseLevel += noiseData.value;
+          noiseLevels.push(noiseData.rawValue);
         }
         ++cnt;
         if(cnt >= numRecords) {
           SoundLevel.stop();
+
+          const rms = noiseLevels.reduce((acc, val) => acc + val * val, 0) / noiseLevels.length;
+          const decibels = 20 * Math.log10(Math.sqrt(rms));
           console.log("recorded", cnt, "values")
-          resolve(Math.ceil(noiseLevel/(cnt-2) + noiseLevelNormilizer));
+          resolve(decibels);
         }
       };
     });
@@ -213,7 +216,7 @@ const App = () => {
 
       <Text style={styles.text}>Latitude: {data.lat}</Text>
       <Text style={styles.text}>Longitude: {data.long}</Text>
-      <Text style={styles.text}>Noise Level: {data.noise} dB</Text>
+      <Text style={styles.text}>Noise Level: {data.noise.toFixed(2)} dB</Text>
       <Text style={styles.text}>Timestamp: {data.timestamp}</Text>
 
       <TouchableOpacity style={styles.button} onPress={handleShareNoiseLevel}>
