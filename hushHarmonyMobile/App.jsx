@@ -5,14 +5,17 @@ import Geolocation from 'react-native-geolocation-service';
 import { check, request, PERMISSIONS, RESULTS } from 'react-native-permissions';
 import SoundLevel from 'react-native-sound-level';
 
+import { BACKEND_URL } from "@env";
+
+console.log(BACKEND_URL);
+
 const App = () => {
-  const [data, setData] = useState({ lat: 0, lng: 0, noise: 0, timestamp: 0 });
-  const updateInterval = 6000; // Update every 60 seconds
+  const [data, setData] = useState({ lat: 0, long: 0, noise: 0, timestamp: 0 });
+  const updateInterval = 12000; // Update every 60 seconds
 
   let intervalId = null;
   useEffect(() => {
     askForPermissions();
-
     // Start location tracking
 
     return () => {
@@ -91,27 +94,13 @@ const App = () => {
     
   };
 
-  const watchPosition = () => {
-    Geolocation.watchPosition(
-      (position) => {
-        console.log('Location updated')
-        console.log(position);
-        // Handle the location update
-      },
-      (error) => {
-        console.log(error);
-      },
-      { enableHighAccuracy: true, distanceFilter: 10, interval: 100 } // You can set the interval and distanceFilter
-    );
-  };
-
   const fetchLocation = () => {
     return new Promise((resolve, reject) => {
       Geolocation.getCurrentPosition(
         (position) => {
           resolve({
             lat: position.coords.latitude,
-            lng: position.coords.longitude,
+            long: position.coords.longitude,
             timestamp: new Date().toISOString()
           });
         },
@@ -126,21 +115,48 @@ const App = () => {
 
   const fetchNoiseLevel = () => {
     return new Promise((resolve) => {
-      SoundLevel.start(250); // interval 250ms
+      SoundLevel.start(20); // interval 250ms
       let cnt = 0;
+      const numRecords = 100;
       let noiseLevel = 0;
+      const noiseLevelNormilizer = 160;
       SoundLevel.onNewFrame = (noiseData) => {
+        console.log("noise level", noiseData);
         // skip first 2 values for calibrating
         if(cnt > 1) {
           noiseLevel += noiseData.value;
         }
         ++cnt;
-        if(cnt == 5) {
+        if(cnt >= numRecords) {
           SoundLevel.stop();
-          resolve(Math.ceil(noiseLevel/(cnt-2)));
+          console.log("recorded", cnt, "values")
+          resolve(Math.ceil(noiseLevel/(cnt-2) + noiseLevelNormilizer));
         }
       };
     });
+  };
+
+
+  const sendDataToMongoDB = async (noiseData) => {
+    try {
+      const response = await fetch(`${BACKEND_URL}/collect-noise-data`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(noiseData),
+      });
+      if (response.ok) {
+        console.log('Data sent successfully');
+      } else {
+        console.log('Failed to send data');
+      }
+    } catch (error) {
+      console.error('Error:', error);
+      // console.log(error.message)
+      console.error(error.message);
+      console.error(error.stack);
+    }
   };
 
 
@@ -154,7 +170,14 @@ const App = () => {
       setData({
         ...locationData,
         noise: noiseLevel,
-      });
+      })
+
+      const dto = {
+        ...locationData,
+        noise: noiseLevel,
+      }
+      await sendDataToMongoDB(dto);
+      console.log("Data sent to MongoDB", dto);
     } catch (error) {
       console.log('Error fetching data:', error);
     }
@@ -164,7 +187,7 @@ const App = () => {
   return (
     <View style={styles.container}>
       <Text style={styles.text}>Latitude: {data.lat}</Text>
-      <Text style={styles.text}>Longitude: {data.lng}</Text>
+      <Text style={styles.text}>Longitude: {data.long}</Text>
       <Text style={styles.text}>Noise Level: {data.noise} dB</Text>
       <Text style={styles.text}>Timestamp: {data.timestamp}</Text>
     </View>
