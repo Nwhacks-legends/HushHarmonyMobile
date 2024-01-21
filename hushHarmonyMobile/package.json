@@ -10,8 +10,16 @@
     "test": "jest"
   },
   "dependencies": {
+<<<<<<< Updated upstream
+=======
+    "@react-native-community/audio-toolkit": "^2.0.3",
+>>>>>>> Stashed changes
     "react": "18.2.0",
-    "react-native": "0.73.2"
+    "react-native": "0.73.2",
+    "react-native-background-fetch": "^4.2.1",
+    "react-native-geolocation-service": "^5.3.1",
+    "react-native-permissions": "^4.0.4",
+    "react-native-sound-level": "^1.2.0"
   },
   "devDependencies": {
     "@babel/core": "^7.20.0",

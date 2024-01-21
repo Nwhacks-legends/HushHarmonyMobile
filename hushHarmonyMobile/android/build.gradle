@@ -10,7 +10,11 @@ buildscript {
     repositories {
         google()
         mavenCentral()
+<<<<<<< Updated upstream
     }
+=======
+    }   
+>>>>>>> Stashed changes
     dependencies {
         classpath("com.android.tools.build:gradle")
         classpath("com.facebook.react:react-native-gradle-plugin")
@@ -19,3 +23,19 @@ buildscript {
 }
 
 apply plugin: "com.facebook.react.rootproject"
+<<<<<<< Updated upstream
+=======
+
+allprojects {
+    repositories {
+        maven {
+            url("${project(':react-native-background-fetch').projectDir}/libs")
+        }
+        mavenLocal()
+        mavenCentral()
+        google()
+        jcenter() // Optional: jcenter is being phased out, but may be needed for older dependencies
+        
+    }
+}
+>>>>>>> Stashed changes
