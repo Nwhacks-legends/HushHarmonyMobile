@@ -10,10 +10,7 @@
     "test": "jest"
   },
   "dependencies": {
-<<<<<<< Updated upstream
-=======
     "@react-native-community/audio-toolkit": "^2.0.3",
->>>>>>> Stashed changes
     "react": "18.2.0",
     "react-native": "0.73.2",
     "react-native-background-fetch": "^4.2.1",
