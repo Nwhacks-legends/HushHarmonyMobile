@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { View, Text, StyleSheet, Platform, PermissionsAndroid, TouchableOpacity, Image} from 'react-native';
 import BackgroundFetch from "react-native-background-fetch";
-import Geolocation from 'react-native-geolocation-service';
+import Geolocation, { stopObserving } from 'react-native-geolocation-service';
 import { check, request, PERMISSIONS, RESULTS } from 'react-native-permissions';
 import SoundLevel from 'react-native-sound-level';
 import logo from './assets/logo.png';
@@ -11,9 +11,10 @@ import { BACKEND_URL } from "@env";
 console.log(BACKEND_URL);
 
 const App = () => {
-  const [data, setData] = useState({ lat: 0, long: 0, noise: 0, timestamp: 0 });
-  const updateInterval = 2400; // Update every 60 seconds
+  const updateInterval = 4800; // Update every 60 seconds
   const [showSuccessMessage, setShowSuccessMessage] = useState(false);
+  const [noiseData, setNoiseData] = useState(0);
+  const [location, setLocation] = useState({ lat: 0, long: 0, timestamp: 0 });
 
 
   let intervalId = null;
@@ -39,7 +40,6 @@ const App = () => {
       locationPermission = await request(PERMISSIONS.ANDROID.ACCESS_FINE_LOCATION);
     }
 
-
     if (microphonePermission === RESULTS.GRANTED && locationPermission === RESULTS.GRANTED) {
       if(intervalId != null) {
         clearImmediate(intervalId);
@@ -57,20 +57,6 @@ const App = () => {
     }
   }
 
-  const onLocationFetch = () => {
-    console.log('Location fetched');
-    Geolocation.getCurrentPosition(
-      (position) => {
-        console.log(position);
-        // Process the location here
-      },
-      (error) => {
-        console.log(error);
-      },
-      { enableHighAccuracy: true, timeout: 15000, maximumAge: 10000 }
-    );
-  };
-
   const initBackgroundFetch = async () => {
     console.log('Initializing background fetch')
     BackgroundFetch.configure({
@@ -80,8 +66,9 @@ const App = () => {
     }, async () => {
       console.log("[js] Received background-fetch event");
       
-      const locationData = await fetchLocation();
+      
       const noiseLevel = await fetchNoiseLevel();
+      const locationData = await fetchLocation();
       const noiseData = {
         ...locationData,
         noise: noiseLevel,
@@ -113,9 +100,11 @@ const App = () => {
     return new Promise((resolve, reject) => {
       Geolocation.getCurrentPosition(
         (position) => {
+          const lat = position.coords.latitude;
+          const long = position.coords.longitude;
           resolve({
-            lat: position.coords.latitude,
-            long: position.coords.longitude,
+            lat: lat,
+            long: long,
             timestamp: new Date().toISOString()
           });
         },
@@ -123,7 +112,7 @@ const App = () => {
           console.error(error);
           reject(error);
         },
-        { enableHighAccuracy: true }
+        { enableHighAccuracy: true, timeout: 20000, maximumAge: 5, forceRequestLocation: true }
       );
     });
   };
@@ -180,15 +169,18 @@ const App = () => {
 
   const fetchData = async () => {
     try {
-      const locationData = await fetchLocation();
-      const noiseLevel = await fetchNoiseLevel();
+      const locationDataPromise = fetchLocation();
+      const noiseLevelPromise = fetchNoiseLevel();
+
+      
+      const noiseLevel = await noiseLevelPromise;
+      
+      setNoiseData(noiseLevel);
+      const locationData = await locationDataPromise;
+      setLocation(locationData);
 
       console.log('Location data:', locationData);
       console.log('Noise level:', noiseLevel);
-      setData({
-        ...locationData,
-        noise: noiseLevel,
-      })
     } catch (error) {
       console.log('Error fetching data:', error);
     }
@@ -196,10 +188,10 @@ const App = () => {
 
   const handleShareNoiseLevel = async () => {
     try {
-      const noiseData = data;
-  
-      await sendDataToBackend(noiseData);
-      console.log("Shared noise data", noiseData);
+      
+      const data = {...location, noise: noiseData};
+      await sendDataToBackend(data);
+      console.log("Shared noise data", data);
       setShowSuccessMessage(true);
       setTimeout(() => setShowSuccessMessage(false), 3000);
     } catch (error) {
@@ -214,10 +206,10 @@ const App = () => {
         <Text style={styles.appTitle}>HushHarmony</Text>
       </View>
 
-      <Text style={styles.text}>Latitude: {data.lat}</Text>
-      <Text style={styles.text}>Longitude: {data.long}</Text>
-      <Text style={styles.text}>Noise Level: {data.noise.toFixed(2)} dB</Text>
-      <Text style={styles.text}>Timestamp: {data.timestamp}</Text>
+      <Text style={styles.text}>Latitude: {location.lat}</Text>
+      <Text style={styles.text}>Longitude: {location.long}</Text>
+      <Text style={styles.text}>Noise Level: {noiseData.toFixed(2)} dB</Text>
+      <Text style={styles.text}>Timestamp: {location.timestamp}</Text>
 
       <TouchableOpacity style={styles.button} onPress={handleShareNoiseLevel}>
       <Text style={styles.buttonText}>Share current noise level</Text>
